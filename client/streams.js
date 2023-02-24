@@ -13,12 +13,32 @@ class StreamManager {
         this._initWebSocket();
     }
 
+    listen = (addon, name) => {
+        if (!this._ready()) {
+            console.log("Cannot listen to \"" + addon + "/" + name + "\": stream manager is not ready");
+            return;
+        }
+
+        // Request to listen to given stream
+        this.ws.send(this._dataFrame("LISTEN", addon, name));
+    }
+
+    stopListening = (addon, name) => {
+        if (!this._ready()) {
+            console.log("Cannot stop listening to \"" + addon + "/" + name + "\": stream manager is not ready");
+            return;
+        }
+
+        // Request to listen to given stream
+        this.ws.send(this._dataFrame("STOP_LISTENING", addon, name));
+    }
+
     startStream = (name, heartbeat = 5) => {
         // Minimum heartbeat of one beat every second
         if (heartbeat < 1) heartbeat = 1;
 
         if (!this._ready()) {
-            console.log("Cannot start \"" + name + "\": stream manager is not ready yet.");
+            console.log("Cannot start \"" + name + "\": stream manager is not ready");
             return;
         }
 
@@ -31,9 +51,9 @@ class StreamManager {
         return this.ws != null && this.ws.readyState === 1 && this.authenticated;
     }
 
-    _dataFrame = (type, stream = null, data = {}) => {
+    _dataFrame = (type, addon = this.addon, stream = null, data = {}) => {
         // Build a standardized streaming packet
-        return JSON.stringify({ addon: this.addon, type: type, user: this.userToken, stream: stream, data: data });
+        return JSON.stringify({ addon: addon, type: type, user: this.userToken, stream: stream, data: data });
     }
 
     _initWebSocket = () => {
@@ -62,7 +82,12 @@ class StreamManager {
             } else if (data.type === "STREAM_FAILED") {
                 console.log("Stream \"" + data.stream + "\" failed to start: that stream name is already occupied");
                 delete streams[data.stream];
+            } else if (data.type === "LISTENING") {
+                console.log("Now successfully listening to \"" + data.stream + "\"");
+            } else if (data.type === "NOT_LISTENING") {
+                console.log("No longer listening to \"" + data.stream + "\"");
             }
+
         }
 
         this.ws.onerror = (e) => {
@@ -72,6 +97,8 @@ class StreamManager {
                 setTimeout(this._initWebSocket, 5000);
             }
         }
+
+        // TODO properly handle clean disconnect
     }
 }
 
